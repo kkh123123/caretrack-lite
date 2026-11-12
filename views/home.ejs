@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CareTrack Lite — Learning project</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">+</span>
+          <span>
+            <strong>CareTrack Lite</strong>
+            <span class="brand-sub">A simplified care-tracking app</span>
+          </span>
+        </div>
+        <span class="tag">Learning project</span>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <span class="eyebrow">Care dashboard</span>
+        <h1>Patients and bookings</h1>
+        <p>
+          Add patients, update their observed status, and schedule appointments.
+          This small app uses the same structure as the library management system:
+          Express, EJS, Knex, and PostgreSQL.
+        </p>
+      </section>
+
+      <!-- Quick statistics calculated in app.js -->
+      <section class="stats">
+        <article class="stat">
+          <span class="stat-label">Patients</span>
+          <strong class="stat-value"><%= stats.patients %></strong>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Under treatment</span>
+          <strong class="stat-value"><%= stats.underTreatment %></strong>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Discharged</span>
+          <strong class="stat-value"><%= stats.discharged %></strong>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Pending bookings</span>
+          <strong class="stat-value"><%= stats.pendingBookings %></strong>
+        </article>
+      </section>
+
+      <div class="two-col">
+        <!-- CREATE: patient -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Add a patient</h2>
+            <p>New patients start with the status <b>Waiting</b>.</p>
+          </div>
+          <form class="card-body form-grid" method="POST" action="/patients/add">
+            <label class="field field-full">
+              <span>Name *</span>
+              <input type="text" name="name" maxlength="100" required placeholder="e.g. Alice Tan" />
+            </label>
+            <label class="field">
+              <span>Age</span>
+              <input type="number" name="age" min="0" max="130" placeholder="e.g. 34" />
+            </label>
+            <label class="field">
+              <span>Phone</span>
+              <input type="text" name="phone" maxlength="30" placeholder="e.g. 555-0101" />
+            </label>
+            <label class="field field-full">
+              <span>Illness / reason for visit</span>
+              <input type="text" name="illness" maxlength="150" placeholder="e.g. Asthma" />
+            </label>
+            <div class="field-full">
+              <button class="btn btn-primary" type="submit">Add patient</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- CREATE: booking -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Book an appointment</h2>
+            <p>Choose a patient, a doctor, and a time.</p>
+          </div>
+
+          <% if (patients.length === 0) { %>
+            <div class="card-body">
+              <p class="muted">Add a patient first, then you can create a booking.</p>
+            </div>
+          <% } else { %>
+            <form class="card-body form-grid" method="POST" action="/bookings/add">
+              <label class="field field-full">
+                <span>Patient *</span>
+                <select name="patient_id" required>
+                  <option value="">Choose a patient…</option>
+                  <% patients.forEach(function (patient) { %>
+                    <option value="<%= patient.id %>"><%= patient.name %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label class="field">
+                <span>Doctor</span>
+                <input type="text" name="doctor_name" maxlength="100" placeholder="e.g. Dr. Patel" />
+              </label>
+              <label class="field">
+                <span>Date and time *</span>
+                <input
+                  type="datetime-local"
+                  name="scheduled_at"
+                  value="<%= defaultScheduleValue() %>"
+                  required
+                />
+              </label>
+              <label class="field field-full">
+                <span>Reason</span>
+                <input type="text" name="reason" maxlength="200" placeholder="e.g. Follow-up review" />
+              </label>
+              <div class="field-full">
+                <button class="btn btn-primary" type="submit">Create booking</button>
+              </div>
+            </form>
+          <% } %>
+        </section>
+      </div>
+
+      <!-- READ / UPDATE / DELETE: patients -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Patients</h2>
+          <p><%= patients.length %> record(s)</p>
+        </div>
+
+        <% if (patients.length === 0) { %>
+          <div class="card-body">
+            <p class="muted">No patients yet. Use the form above to add one.</p>
+          </div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Age</th>
+                  <th>Illness</th>
+                  <th>Observed status</th>
+                  <th>Change status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% patients.forEach(function (patient) { %>
+                  <tr>
+                    <td>
+                      <strong><%= patient.name %></strong>
+                      <span class="cell-sub"><%= patient.phone || "No phone" %></span>
+                    </td>
+                    <td><%= patient.age === null ? "—" : patient.age %></td>
+                    <td><%= patient.illness || "—" %></td>
+                    <td>
+                      <span class="status status-<%= patient.status %>">
+                        <%= statusLabel(patient.status) %>
+                      </span>
+                    </td>
+                    <td>
+                      <form class="inline-form" method="POST" action="/patients/<%= patient.id %>/status">
+                        <select name="status" aria-label="Status for <%= patient.name %>">
+                          <% patientStatuses.forEach(function (status) { %>
+                            <option value="<%= status %>" <%= patient.status === status ? "selected" : "" %>>
+                              <%= statusLabel(status) %>
+                            </option>
+                          <% }); %>
+                        </select>
+                        <button class="btn btn-sm" type="submit">Save</button>
+                      </form>
+                    </td>
+                    <td>
+                      <form
+                        method="POST"
+                        action="/patients/<%= patient.id %>/delete"
+                        onsubmit="return confirm('Delete this patient and all their bookings?');"
+                      >
+                        <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+
+      <!-- READ / UPDATE / DELETE: bookings -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Bookings</h2>
+          <p><%= bookings.length %> record(s)</p>
+        </div>
+
+        <% if (bookings.length === 0) { %>
+          <div class="card-body">
+            <p class="muted">No bookings yet. Use the form above to create one.</p>
+          </div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Patient</th>
+                  <th>Doctor</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Change status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% bookings.forEach(function (booking) { %>
+                  <tr>
+                    <td class="nowrap"><%= formatDateTime(booking.scheduled_at) %></td>
+                    <td><%= booking.patient_name || "Unknown patient" %></td>
+                    <td><%= booking.doctor_name || "Unassigned" %></td>
+                    <td><%= booking.reason || "—" %></td>
+                    <td>
+                      <span class="status status-<%= booking.status %>">
+                        <%= statusLabel(booking.status) %>
+                      </span>
+                    </td>
+                    <td>
+                      <form class="inline-form" method="POST" action="/bookings/<%= booking.id %>/status">
+                        <select name="status" aria-label="Status for booking <%= booking.id %>">
+                          <% bookingStatuses.forEach(function (status) { %>
+                            <option value="<%= status %>" <%= booking.status === status ? "selected" : "" %>>
+                              <%= statusLabel(status) %>
+                            </option>
+                          <% }); %>
+                        </select>
+                        <button class="btn btn-sm" type="submit">Save</button>
+                      </form>
+                    </td>
+                    <td>
+                      <form
+                        method="POST"
+                        action="/bookings/<%= booking.id %>/delete"
+                        onsubmit="return confirm('Delete this booking?');"
+                      >
+                        <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
+
+      <p class="footnote">
+        CareTrack Lite is a classroom project. It has no login system yet — that is a
+        good next exercise.
+      </p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">Built with Express, EJS, Knex, and PostgreSQL.</div>
+    </footer>
+  </body>
+</html>
